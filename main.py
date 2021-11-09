@@ -1,5 +1,7 @@
 import math
 import pygame as pg
+import time
+import taichi as tc
 
 WIN_WIDTH = 800
 WIN_HEIGHT = 600
@@ -7,6 +9,8 @@ WIN_HEIGHT = 600
 CAMERA_POS = 0, -100, 0
 CAMERA_MOVE_SPEED = 0.2
 CAMERA_TILT_SPEED = 0.01
+
+MOUSE_POS = (20, 20)
 
 WIN = pg.display.set_mode((WIN_WIDTH, WIN_HEIGHT), pg.DOUBLEBUF, 64)
 pg.display.set_caption("Projection of 3D points onto 2D screen")
@@ -72,14 +76,14 @@ def calculate_pos_on_screen(camera_perspective, point_pos):
 
     if project(displacement, camera_perspective.sidedir).magnitude() == 0:
         x_pos = 0
-    elif (camera_perspective.sidedir * accuracy + project(displacement, camera_perspective.sidedir)).magnitude() < project(displacement, camera_perspective.sidedir).magnitude():
+    elif camera_perspective.sidedir.dot(project(displacement, camera_perspective.sidedir)) < 0:
         x_pos = (ratio * project(displacement, camera_perspective.sidedir)).magnitude()
     else:
         x_pos = -(ratio * project(displacement, camera_perspective.sidedir)).magnitude()
 
     if project(displacement, camera_perspective.updir).magnitude() == 0:
         y_pos = 0
-    elif (camera_perspective.updir * accuracy + project(displacement, camera_perspective.updir)).magnitude() < project(displacement, camera_perspective.updir).magnitude():
+    elif camera_perspective.updir.dot(project(displacement, camera_perspective.updir)) < 0:
         y_pos = (ratio * project(displacement, camera_perspective.updir)).length()
     else:
         y_pos = -(ratio * project(displacement, camera_perspective.updir)).length()
@@ -91,6 +95,10 @@ class Point:
 
     def __init__(self, positionangles, color):
         self.cords = theta_to_vector(positionangles)
+        self.color = color
+
+    def __init__(self, position, color, a):
+        self.cords = position
         self.color = color
 
 
@@ -106,7 +114,7 @@ class Camera:
 
 def drawWindow(win, ps, cam):
 
-    pg.draw.rect(win, (100, 200, 100), (0, 0, WIN_WIDTH, WIN_HEIGHT))
+    pg.draw.rect(win, (21, 21, 21), (0, 0, WIN_WIDTH, WIN_HEIGHT))
 
     for point in ps:
 
@@ -117,7 +125,7 @@ def drawWindow(win, ps, cam):
         displacement = point.cords - cam.pos
 
         size = round(10/(displacement.magnitude()/30) + 1)
-        if displacement.angle_to(cam.dir) < 90:
+        if displacement.dot(cam.dir) > 0:
             pg.draw.circle(win, point.color, position, size)
 
     f_vector = (project(cam.dir * 40, pg.Vector3(1, 0, 0)).x, project(cam.dir * 40, pg.Vector3(0, 0, 1)).z)
@@ -134,35 +142,41 @@ def drawWindow(win, ps, cam):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
+    circles_up = pg.Vector3(0, 0, 1)
+
     va = pg.Vector3(1, 0, 0)
     vb = pg.Vector3(-1, 0, 0)
 
     points = list()
 
-    campos = pg.Vector3(0, -100, 0)
-    camdir = pg.Vector3(0, 1, 0)
-    camdirup = pg.Vector3(0, 0, 1)
+    campos = pg.Vector3(0, 0, 100)
+    camdir = pg.Vector3(0, 0, -1)
+    camdirup = pg.Vector3(1, 0, 0)
 
     camera = Camera(campos, camdir, camdirup)
 
-    amt = 60
+    amt = 50
 
-    points.append(Point(pg.Vector3(-math.pi / 4, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
+    """points.append(Point(pg.Vector3(-math.pi / 4, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
     points.append(Point(pg.Vector3(-math.pi / 4, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
     points.append(Point(pg.Vector3(math.pi / 4, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
     points.append(Point(pg.Vector3(math.pi / 4, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
     points.append(Point(pg.Vector3(-math.pi * 0.75, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
     points.append(Point(pg.Vector3(-math.pi * 0.75, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
     points.append(Point(pg.Vector3(math.pi * 0.75, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(math.pi * 0.75, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
+    points.append(Point(pg.Vector3(math.pi * 0.75, math.pi / 4, 40), pg.Vector3(255, 0, 0)))"""
 
     for x in range(amt):
 
         for y in range(amt):
 
-            angles = pg.Vector3((x*math.pi/amt, y*2.0 * math.pi/amt, 40))
+            """angles = pg.Vector3((x*math.pi/amt, y*2.0 * math.pi/amt, 40))
             color = ((math.sin(float(y)/amt*2*math.pi) + 1) * 255 / 2, (math.sin(float(x)/amt*2*math.pi) + 1) * 255 / 2, 255)
-            points.append(Point(angles, color))
+            points.append(Point(angles, color))"""
+
+            color = ((math.sin(float(y) / amt * 2 * math.pi) + 1) * 255 / 2,
+                     (math.sin(float(x) / amt * 2 * math.pi) + 1) * 255 / 2, 255)
+            points.append(Point(pg.Vector3(x/amt*100, y/amt*100, 0), color, 1))
 
     iterations = 0
     over = False
@@ -184,6 +198,8 @@ if __name__ == '__main__':
             if event.type == pg.QUIT:
                 over = True
             if event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE:
+                    over = True
                 if event.key == pg.K_s:
                     back = True
                 elif event.key == pg.K_w:
@@ -239,11 +255,14 @@ if __name__ == '__main__':
         elif down:
             camera.pos -= camera.updir * CAMERA_MOVE_SPEED
         if tleft:
-            camera.dir = camera.dir.rotate_rad(-CAMERA_TILT_SPEED, camera.updir)
-            camera.sidedir = camera.sidedir.rotate_rad(-CAMERA_TILT_SPEED, camera.updir)
+            camera.dir = camera.dir.rotate_rad(-CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
+            camera.sidedir = camera.sidedir.rotate_rad(-CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
+            camera.updir = camera.updir.rotate_rad(-CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
+
         elif tright:
-            camera.dir = camera.dir.rotate_rad(CAMERA_TILT_SPEED, camera.updir)
-            camera.sidedir = camera.sidedir.rotate_rad(CAMERA_TILT_SPEED, camera.updir)
+            camera.dir = camera.dir.rotate_rad(CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
+            camera.sidedir = camera.sidedir.rotate_rad(CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
+            camera.updir = camera.updir.rotate_rad(CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
         if tup:
             camera.dir = camera.dir.rotate_rad(CAMERA_TILT_SPEED, camera.sidedir)
             camera.updir = camera.updir.rotate_rad(CAMERA_TILT_SPEED, camera.sidedir)
@@ -251,7 +270,13 @@ if __name__ == '__main__':
             camera.dir = camera.dir.rotate_rad(-CAMERA_TILT_SPEED, camera.sidedir)
             camera.updir = camera.updir.rotate_rad(-CAMERA_TILT_SPEED, camera.sidedir)
 
-        rotate(points, pg.Vector3(1, 1, 1), 0.01)
+        """rotate(points, pg.Vector3(0, 1, 0), 0.002)
+        circles_up.rotate(0.002, pg.Vector3(0, 1, 0))
+        rotate(points, circles_up, 0.01)"""
+
+        for point in points:
+            point.cords.z = math.sin(iterations/100 + point.cords.x/10)*10
+            point.cords.z = point.cords.z + math.cos(iterations / 100 + point.cords.y / 10) * 10
 
         points.sort(key=point_sorter)
         drawWindow(WIN, points, camera)
