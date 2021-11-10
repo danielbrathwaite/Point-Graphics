@@ -1,62 +1,27 @@
 import math
-import pygame as pg
-import time
-import taichi as tc
+import random
 
-WIN_WIDTH = 800
-WIN_HEIGHT = 600
+import pygame as pg
 
 CAMERA_POS = 0, -100, 0
-CAMERA_MOVE_SPEED = 0.2
+CAMERA_MOVE_SPEED = 0.4
 CAMERA_TILT_SPEED = 0.01
 
-MOUSE_POS = (20, 20)
-
-WIN = pg.display.set_mode((WIN_WIDTH, WIN_HEIGHT), pg.DOUBLEBUF, 64)
+WIN = pg.display.set_mode((0, 0), pg.FULLSCREEN, 64)
+WIN_WIDTH = pg.display.get_window_size()[0]
+WIN_HEIGHT = pg.display.get_window_size()[1]
 pg.display.set_caption("Projection of 3D points onto 2D screen")
+
+MOUSE_POS = (WIN_WIDTH/2, WIN_HEIGHT/2)
 
 
 def point_sorter(p):
     return -p.cords.distance_to(camera.pos)
 
 
-def vector_to_theta(positionvect):
-    x = positionvect.x
-    y = positionvect.y
-    z = positionvect.z
+def rotate(pointlist, axisvect, rotationamt):
 
-    theta1 = math.atan(y / x)
-
-    xy_len = math.sqrt((x * x) + (y * y))
-    theta2 = math.atan(z / xy_len)
-    if x < 0:
-        theta1 += math.pi
-    """theta1 %= math.pi*2
-    if theta1 > math.pi/2 or theta1 < -math.pi:
-        theta2 += math.pi"""
-
-    len = math.sqrt((x * x) + (y * y) + (z * z))
-
-    return pg.Vector3(theta1, theta2, len)
-
-
-def theta_to_vector(positionangles):
-    theta1 = positionangles.x
-    theta2 = positionangles.y
-    len = positionangles.z
-
-    z = math.sin(theta2) * len
-
-    xy_len = math.cos(theta2) * len
-    x = math.cos(theta1) * xy_len
-    y = math.sin(theta1) * xy_len
-
-    return pg.Vector3(x, y, z)
-
-
-def rotate(points, axisvect, rotationamt):
-
-    for p in points:
+    for p in pointlist:
         p.cords = p.cords.rotate_rad(rotationamt, axisvect)
 
 
@@ -70,9 +35,6 @@ def calculate_pos_on_screen(camera_perspective, point_pos):
     true_focal_length = camera_perspective.focal_length / math.cos(math.pi * camera_perspective.dir.angle_to(displacement) / 180)
 
     ratio = true_focal_length / displacement.length()
-
-    #distance of the mild distortion along x-and y-axis
-    accuracy = 0.001
 
     if project(displacement, camera_perspective.sidedir).magnitude() == 0:
         x_pos = 0
@@ -88,14 +50,10 @@ def calculate_pos_on_screen(camera_perspective, point_pos):
     else:
         y_pos = -(ratio * project(displacement, camera_perspective.updir)).length()
 
-    return x_pos, y_pos
+    return x_pos + WIN_WIDTH/2, y_pos + WIN_HEIGHT/2
 
 
 class Point:
-
-    def __init__(self, positionangles, color):
-        self.cords = theta_to_vector(positionangles)
-        self.color = color
 
     def __init__(self, position, color, a):
         self.cords = position
@@ -120,13 +78,14 @@ def drawWindow(win, ps, cam):
 
         pos = calculate_pos_on_screen(cam, point.cords)
 
-        position = (pos[0] + WIN_WIDTH/2, pos[1] + WIN_HEIGHT/2)
-
         displacement = point.cords - cam.pos
 
-        size = round(10/(displacement.magnitude()/30) + 1)
+        size = round(10/(displacement.magnitude()/30) + 0.5)
+
+        draw_color = pg.Color(point.color).lerp(pg.Color(0, 0, 0), min(displacement.magnitude(), 500)/500)
+
         if displacement.dot(cam.dir) > 0:
-            pg.draw.circle(win, point.color, position, size)
+            pg.draw.circle(win, draw_color, pos, size)
 
     f_vector = (project(cam.dir * 40, pg.Vector3(1, 0, 0)).x, project(cam.dir * 40, pg.Vector3(0, 0, 1)).z)
     u_vector = (project(cam.updir * 40, pg.Vector3(1, 0, 0)).x, project(cam.updir * 40, pg.Vector3(0, 0, 1)).z)
@@ -139,8 +98,10 @@ def drawWindow(win, ps, cam):
     pg.display.update()
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+
+    pg.mouse.set_visible(False)
+    pg.mouse.set_pos([MOUSE_POS[0], MOUSE_POS[1]])
 
     circles_up = pg.Vector3(0, 0, 1)
 
@@ -157,40 +118,20 @@ if __name__ == '__main__':
 
     amt = 50
 
-    """points.append(Point(pg.Vector3(-math.pi / 4, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(-math.pi / 4, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(math.pi / 4, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(math.pi / 4, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(-math.pi * 0.75, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(-math.pi * 0.75, math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(math.pi * 0.75, -math.pi / 4, 40), pg.Vector3(255, 0, 0)))
-    points.append(Point(pg.Vector3(math.pi * 0.75, math.pi / 4, 40), pg.Vector3(255, 0, 0)))"""
-
     for x in range(amt):
-
         for y in range(amt):
-
-            """angles = pg.Vector3((x*math.pi/amt, y*2.0 * math.pi/amt, 40))
-            color = ((math.sin(float(y)/amt*2*math.pi) + 1) * 255 / 2, (math.sin(float(x)/amt*2*math.pi) + 1) * 255 / 2, 255)
-            points.append(Point(angles, color))"""
-
-            color = ((math.sin(float(y) / amt * 2 * math.pi) + 1) * 255 / 2,
+            """color = ((math.sin(float(y) / amt * 2 * math.pi) + 1) * 255 / 2,
                      (math.sin(float(x) / amt * 2 * math.pi) + 1) * 255 / 2, 255)
-            points.append(Point(pg.Vector3(x/amt*100, y/amt*100, 0), color, 1))
+            points.append(Point(pg.Vector3(x/amt*30, y/amt*30, 0), color, 1))"""
+            vect = pg.Vector3(random.random()-0.5, random.random()-0.5, random.random()-0.5).normalize()*50
+            points.append(Point(vect, (255, 200, 255), 1))
+            points.append(Point(-vect*0.7, (200, 200, 255), 1))
+
+    points.append(Point(pg.Vector3(0, 0, 0), (255, 255, 255), 1))
 
     iterations = 0
-    over = False
-    back = False
-    forward = False
-    left = False
-    up = False
-    down = False
-    right = False
-    tright = False
-    tleft = False
-    tup= False
-    tdown = False
-    while(not over):
+    over = back = forward = left = up = down = right = tright = tleft = tup = tdown = False
+    while not over:
 
         iterations += 1
 
@@ -212,14 +153,6 @@ if __name__ == '__main__':
                     down = True
                 elif event.key == pg.K_SPACE:
                     up = True
-                if event.key == pg.K_LEFT:
-                    tleft = True
-                elif event.key == pg.K_RIGHT:
-                    tright = True
-                if event.key == pg.K_UP:
-                    tup = True
-                elif event.key == pg.K_DOWN:
-                    tdown = True
             if event.type == pg.KEYUP:
                 if event.key == pg.K_s:
                     back = False
@@ -233,14 +166,6 @@ if __name__ == '__main__':
                     down = False
                 elif event.key == pg.K_SPACE:
                     up = False
-                if event.key == pg.K_LEFT:
-                    tleft = False
-                elif event.key == pg.K_RIGHT:
-                    tright = False
-                if event.key == pg.K_UP:
-                    tup = False
-                elif event.key == pg.K_DOWN:
-                    tdown = False
 
         if back:
             camera.pos -= camera.dir * CAMERA_MOVE_SPEED
@@ -254,29 +179,28 @@ if __name__ == '__main__':
             camera.pos += camera.updir * CAMERA_MOVE_SPEED
         elif down:
             camera.pos -= camera.updir * CAMERA_MOVE_SPEED
-        if tleft:
-            camera.dir = camera.dir.rotate_rad(-CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
-            camera.sidedir = camera.sidedir.rotate_rad(-CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
-            camera.updir = camera.updir.rotate_rad(-CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
 
-        elif tright:
-            camera.dir = camera.dir.rotate_rad(CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
-            camera.sidedir = camera.sidedir.rotate_rad(CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
-            camera.updir = camera.updir.rotate_rad(CAMERA_TILT_SPEED, pg.Vector3(0, 0, 1))
-        if tup:
-            camera.dir = camera.dir.rotate_rad(CAMERA_TILT_SPEED, camera.sidedir)
-            camera.updir = camera.updir.rotate_rad(CAMERA_TILT_SPEED, camera.sidedir)
-        elif tdown:
-            camera.dir = camera.dir.rotate_rad(-CAMERA_TILT_SPEED, camera.sidedir)
-            camera.updir = camera.updir.rotate_rad(-CAMERA_TILT_SPEED, camera.sidedir)
+        horizontal_rotation = (pg.mouse.get_pos()[0] - MOUSE_POS[0]) * CAMERA_TILT_SPEED / 5
+        vertical_rotation = (MOUSE_POS[1] - pg.mouse.get_pos()[1]) * CAMERA_TILT_SPEED / 5
 
-        """rotate(points, pg.Vector3(0, 1, 0), 0.002)
-        circles_up.rotate(0.002, pg.Vector3(0, 1, 0))
-        rotate(points, circles_up, 0.01)"""
+        camera.dir = camera.dir.rotate_rad(horizontal_rotation, pg.Vector3(0, 0, 1))
+        camera.sidedir = camera.sidedir.rotate_rad(horizontal_rotation, pg.Vector3(0, 0, 1))
+        camera.updir = camera.updir.rotate_rad(horizontal_rotation, pg.Vector3(0, 0, 1))
+
+        camera.dir = camera.dir.rotate_rad(vertical_rotation, camera.sidedir)
+        camera.updir = camera.updir.rotate_rad(vertical_rotation, camera.sidedir)
+
+        pg.mouse.set_pos([MOUSE_POS[0], MOUSE_POS[1]])
+
+        """for point in points:
+            point.cords.z = math.sin(iterations/100 + point.cords.x/10)*10
+            point.cords.z = point.cords.z + math.cos(iterations / 100 + point.cords.y / 10) * 10"""
 
         for point in points:
-            point.cords.z = math.sin(iterations/100 + point.cords.x/10)*10
-            point.cords.z = point.cords.z + math.cos(iterations / 100 + point.cords.y / 10) * 10
+            if point.cords.magnitude() > 47:
+                point.cords = point.cords.rotate_rad(0.01, pg.Vector3(1, 0, 1))
+            else:
+                point.cords = point.cords.rotate_rad(-0.01, pg.Vector3(0, 1, 1))
 
         points.sort(key=point_sorter)
         drawWindow(WIN, points, camera)
