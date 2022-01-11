@@ -1,6 +1,6 @@
 ﻿# 3DVectors
-##Daniel Brathwaite
-### 11/8/2021
+Daniel Brathwaite
+11/8/2021
 
 Project Description:
 A first attempt at an implementation of mapping and 
